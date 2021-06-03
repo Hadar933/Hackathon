@@ -8,8 +8,7 @@ import matplotlib.pyplot as plt
 from collections import Counter
 from sklearn.impute import SimpleImputer
 
-
-# nltk.download('punkt') # Add to requirements
+nltk.download('punkt') # Add to requirements
 def load_data(dir):
     df = pd.read_csv(dir)
     return df
@@ -18,14 +17,24 @@ def load_data(dir):
 def look_at_data(df):
     features = list(df.columns)
     (
-            ggplot(df)  # Dataframe
-            + aes(x="")  # Variables to use
-            + geom_boxplot()
+        ggplot(df) # Dataframe
+        + aes(x="") # Variables to use
+        + geom_boxplot()
     )
 
 
 def remove_not_done_movies(df):
     df = df.drop(df[df.status != 'Released'].index)
+    return df
+
+
+def replace_weird_values(df):
+    # Budget:
+    # If nan or zero replace with median
+    df.loc[((df.budget.isna()) | (df.budget == 0)), 'budget'] = df.budget.median()
+
+    # Runtime
+    df.loc[((df.runtime.isna()) | (df.runtime == 0)), 'runtime'] = df.runtime.median()
     return df
 
 
@@ -133,17 +142,6 @@ def process_original_langauge(df):
     return df
 
 
-def main():
-    data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
-    movies_df = load_data(data_dir)
-    # movies_df = pd.read_pickle('train_old.pkl')
-    movies_df = date_col_preprocess(movies_df)
-    print(movies_df.shape)
-    movies_df = remove_bad_samples(movies_df, 4)
-    add_description_word_features(movies_df)
-    print(movies_df.shape)
-
-
 def json_load(json_list, common_vals=None, col_name=None):
     """
     takes a list of string json objects and returns a list of the inside features. e.g. genres or production companies
@@ -238,6 +236,7 @@ def pre_precoss(dataframe, which_label):
     :return:
     """
     df = remove_not_done_movies(dataframe)
+    df = replace_weird_values(df)
     # first assuming revenue response only!!!!
     df = df.drop(labels=[
         'homepage', 'overview', 'title', 'belongs_to_collection', 'id', 'keywords', 'cast', 'crew',
