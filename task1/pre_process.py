@@ -3,11 +3,12 @@ import numpy as np
 from plotnine import ggplot, aes, geom_boxplot # add to requirements
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar # add to requirements
 from sklearn.feature_extraction.text import CountVectorizer
-import dateutil.parser as dparser
+from textblob import TextBlob
+import nltk # Add to requirements
 import datetime
 import matplotlib.pyplot as plt
 
-
+nltk.download('punkt') # Add to requirements
 def load_data(dir):
     df = pd.read_csv(dir)
     return df
@@ -90,17 +91,45 @@ def features_to_drop(df, feat_cols):
     df = df.drop(df, columns=feat_cols)
     return df
 
-def try_txt(df):
-    # NOT DONE YET
+
+def textblob_tokenizer(str_input):
+    # For
+    blob = TextBlob(str_input.lower())
+    tokens = blob.words
+    words = [token.stem() for token in tokens]
+    return words
+
+
+def add_description_word_features(df):
+    """
+    make features for words
+    :param df:
+    :return:
+    """
     text_col = df.overview
-    vectorizer = CountVectorizer(stop_words='english')
-
     txt = text_col.to_list()
-    nonans_txt = [x for x in txt if str(x) != 'nan']
-    txt = " ".join(nonans_txt)
+    txt = ['missing' if x is np.nan else x for x in txt]
+    # nonans_txt = [x for x in txt if str(x) != 'nan']
+    # txt = " ".join(nonans_txt)
+    # words = txt.split(' ')
+    # stem_words = [porter_stemmer.stem(w) for w in words]
+    vectorizer = CountVectorizer(stop_words='english', tokenizer=textblob_tokenizer)
+    matrix = vectorizer.fit_transform(txt)
+    # write in data frame:
+    results = pd.DataFrame(matrix.toarray(), columns=vectorizer.get_feature_names())
+    # Fixme: the join works in a weird way
+    df = df.join(results)
+    return df
 
-    voc = vectorizer.fit_transform([txt])
 
+def process_original_langauge(df):
+    df.loc[((df.original_language != 'en') &
+            (df.original_language != 'fr') &
+            (df.original_language != 'hi') &
+            (df.original_language != 'ru')), 'original_language'] = 'others'
+
+    df = pd.get_dummies(df, columns='original_langauge')
+    return df
 
 def main():
     data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
@@ -109,7 +138,7 @@ def main():
     movies_df = date_col_preprocess(movies_df)
     print(movies_df.shape)
     movies_df = remove_bad_samples(movies_df, 4)
-    try_txt(movies_df)
+    add_description_word_features(movies_df)
     print(movies_df.shape)
 
 
