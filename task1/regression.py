@@ -5,14 +5,12 @@
 ################################################
 #
 import re
-
-import numpy
 import pickle
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, KFold
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Lasso, Ridge
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, VotingRegressor
 
@@ -75,7 +73,7 @@ def plot_many_models(df, y, regressor_lst):
     for model in regressor_lst:
         print(f"current model = {model}")
         rmse_plot(df, y, model)
-    plt.legend(regressor_lst)
+    plt.legend([re.split("\(", str(item))[0] for item in regressor_lst])
     plt.show()
 
 
@@ -124,7 +122,18 @@ def committee(models):
     return VotingRegressor(estimators=estimators)
 
 
-def k_fold_CV(X, y, hyper_params_lst, K, model):
+def initialize_specific_model(param, modelClass):
+    """
+    given some param and regression class model, returns an instance of such model with param initialized
+    :param param: ex. height of tree
+    :param modelClass: some regression class
+    :return: instance of class
+    """
+    if modelClass == RandomForestRegressor:
+        return modelClass(max_depth=param)
+
+
+def k_fold_CV(X, y, hyper_params_lst, K, modelClass):
     """
     performs k-fold cross validation to select desirable Hyper Parameter
     :return:
@@ -134,32 +143,23 @@ def k_fold_CV(X, y, hyper_params_lst, K, model):
     for param in hyper_params_lst:
         rmse_lst = []
         for train, test in kfold.split(X):
-            model.fit(X[train])
-            y_hat = model.predict(X[test])
-            rmse_lst.append(RMSE(y, y_hat))
+            model = initialize_specific_model(param, modelClass)
+            X_train, X_test, y_train, y_test = X.iloc[train, :], X.iloc[test, :], y.iloc[train], y.iloc[test]
+            model.fit(X_train, y_train)
+            y_hat = model.predict(X_test)
+            rmse_lst.append(RMSE(y_test, y_hat))
         curr_param_error = np.mean(rmse_lst)
         best_param, best_error = (param, curr_param_error) if curr_param_error < best_error else (
             best_param, best_error)
-
-
-def split():
-    df = pd.read_csv('movies_dataset.csv')
-    train, validate, test = np.split(df.sample(frac=1, random_state=42), [int(.6 * len(df)), int(.8 * len(df))])
-    trash_idx = np.zeros((train.shape[0])).astype(numpy.bool)
-    trash_idx[[np.random.randint(0, train.shape[0], 100)]] = 1
-    trash = train.iloc[trash_idx]
-    train = train.iloc[~trash_idx]
-    train.to_pickle('train.pkl')
-    test.to_pickle('test.pkl')
-    validate.to_pickle('valid.pkl')
-    trash.to_pickle('trash.pkl')
+    return best_param
 
 
 if __name__ == '__main__':
     X, y = get_Xy1y2_from_pickle("trash.pkl", "revenue")
-    gbr = GradientBoostingRegressor()
-    rfr = RandomForestRegressor()
+    best_depth = k_fold_CV(X, y, [1, 5, 10, 50, 100], 10, RandomForestRegressor)
+    rfr = RandomForestRegressor(max_depth=best_depth)
     lr = LinearRegression()
-    com = committee([gbr, rfr, lr])
-    lst = [gbr, rfr, lr, com]
-    plot_many_models(X, y, lst)
+    lasso = Lasso()
+    ridge = Ridge()
+    com = committee([lasso, ridge, rfr, lr])
+    plot_many_models(X, y, [lasso, ridge, rfr, lr, com])
