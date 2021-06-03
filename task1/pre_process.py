@@ -7,11 +7,9 @@ import datetime
 import matplotlib.pyplot as plt
 from collections import Counter
 from sklearn.impute import SimpleImputer
-from scipy.stats import zscore
-
-#nltk.download('punkt') # Add to requirements
 
 
+# nltk.download('punkt') # Add to requirements
 def load_data(dir):
     df = pd.read_csv(dir)
     return df
@@ -20,21 +18,14 @@ def load_data(dir):
 def look_at_data(df):
     features = list(df.columns)
     (
-        ggplot(df) # Dataframe
-        + aes(x="") # Variables to use
-        + geom_boxplot()
+            ggplot(df)  # Dataframe
+            + aes(x="")  # Variables to use
+            + geom_boxplot()
     )
 
 
 def remove_not_done_movies(df):
     df = df.drop(df[df.status != 'Released'].index)
-    return df
-
-
-def replace_zero_with_nans(df):
-    df.loc[(df.budget <= 0), 'budget'] = np.nan
-    df.loc[(df.runtime <= 0), 'runtime'] = np.nan
-    df.loc[df.vote_count < 0, 'vote_count'] = np.nan
     return df
 
 
@@ -44,7 +35,6 @@ def date_col_preprocess(df):
     2. Add weekday (NaN where problems)
     3. Add holiday
     4. Add how many days has passed from release
-
     :param df: initial pandas DataFrame
     :return: df - after processing the release date
     """
@@ -74,7 +64,6 @@ def date_col_preprocess(df):
     days_num = today_date - date_col
     df['days_from_release'] = days_num.astype('timedelta64[D]')
 
-
     # Drop release_date:
     df = df.drop(columns=['release_date'])
 
@@ -101,13 +90,14 @@ def features_to_drop(df, feat_cols):
     """
     df = df.drop(df, columns=feat_cols)
     return df
-
-
-def textblob_tokenizer(str_input):
-    blob = TextBlob(str_input.lower())
-    tokens = blob.words
-    words = [token.stem() for token in tokens]
-    return words
+#
+#
+# def textblob_tokenizer(str_input):
+#     # For
+#     blob = TextBlob(str_input.lower())
+#     tokens = blob.words
+#     words = [token.stem() for token in tokens]
+#     return words
 
 
 def add_description_word_features(df):
@@ -140,6 +130,17 @@ def process_original_langauge(df):
 
     df = pd.get_dummies(df, columns=['original_language'])
     return df
+
+
+def main():
+    data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
+    movies_df = load_data(data_dir)
+    # movies_df = pd.read_pickle('train_old.pkl')
+    movies_df = date_col_preprocess(movies_df)
+    print(movies_df.shape)
+    movies_df = remove_bad_samples(movies_df, 4)
+    add_description_word_features(movies_df)
+    print(movies_df.shape)
 
 
 def json_load(json_list, common_vals=None, col_name=None):
@@ -229,34 +230,25 @@ def categorical(dataframe):
     return dataframe.join(df1)
 
 
-def pre_precoss(dataframe, target=None):
+def pre_precoss(dataframe, which_label=None):
     """
     performs the pre_process procedure using the sub-functions
     :param dataframe:
-    :param target:
     :return:
     """
     df = remove_not_done_movies(dataframe)
-    df = replace_zero_with_nans(df)
+    # first assuming revenue response only!!!!
     df = df.drop(labels=[
         'homepage', 'overview', 'title', 'belongs_to_collection', 'id', 'keywords', 'cast', 'crew',
         'tagline', 'spoken_languages', 'original_title', 'status'], axis=1)
     df = remove_bad_samples(df, nan_nums=3)  # remove samples with more than three nan features
-    if target == 'revenue':  # for training purposes
-        df = df.drop(labels=['vote_average'], axis=1)
-        y = np.array(df.pop('revenue'))
-    if target == 'vote_average':
-        df = df.drop(labels=['revenue'], axis=1)
-        y = np.array(df.pop('vote_average'))
     df = date_col_preprocess(df)
-    #for col in ['budget', 'runtime', 'vote_count', 'days_from_release']:  # normalizing
-    #    df[col] = (df[col] - df[col].mean()) / df[col].std()
     df = categorical(df)
     df = process_original_langauge(df)
+
     imp = SimpleImputer(missing_values=np.nan, strategy="median")
+    #y = df.pop("revenue") if which_label == "revenue" else df.pop('vote_average')
+    y = df.pop('vote_average')
     imp.fit(df)
     df = imp.transform(df)
-    if target:  # for training purposes, filtering zero responses
-        zeros = y == 0
-        return df[~zeros], y[~zeros]
-    return df
+    return df, np.array(y)

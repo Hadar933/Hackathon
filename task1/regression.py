@@ -22,15 +22,15 @@ def predict(csv_file):
     :param csv_file: csv with movies details. Same format as the training dataset csv.
     :return: a tuple - (a python list with the movies revenues, a python list with the movies avg_votes)
     """
-
-    X = pre_precoss(csv_file)
+    dataframe = pd.read_csv(csv_file)
+    X = pre_precoss(dataframe)
     rev_model = pickle.load(open('rev_model.pkl', 'rb'))
     rating_model = pickle.load(open('rating_model.pkl', 'rb'))
     revenues, ratings = rev_model.predict(X).tolist(), rating_model.predict(X).tolist()
     return revenues, ratings
 
 
-def test_model_error(X_train, y_train, X_test, y_test, model, m_name):
+def test_model_error(X_train, y_train, X_test, y_test, model):
     """
     plots RMSE error of train and test data for some given model
     :param df: dataframe
@@ -56,12 +56,12 @@ def plot_rmse(model, test_mse_err, train_mse_err):
     :param test_mse_err:
     :param train_mse_err:
     """
-    plt.title(f"{model} RMSE(#samples)")
+    #plt.title(f"{model} RMSE(#samples)")
     plt.xlabel('# samples'), plt.ylabel('RMSE')
-    plt.plot(np.sqrt(test_mse_err))
-    plt.plot(np.sqrt(train_mse_err))
-    plt.legend(["Test", "Train"])
-    plt.show()
+    plt.plot(np.sqrt(test_mse_err), label=str(model).split("(")[0])
+    #plt.plot(np.sqrt(train_mse_err))
+    #plt.legend(["Test", "Train"])
+    #plt.show()
 
 
 def committee(models):
@@ -110,24 +110,22 @@ def regression_tree_k_fold_vc(X, y, depths, min_samples_leaf, K, modelClass):
 
 if __name__ == '__main__':
     train = pd.read_pickle('train.pkl')
+    X, y = pre_precoss(train, "revenue")
     valid = pd.read_pickle('valid.pkl')
+    X_test, y_test = pre_precoss(valid, "")
     depths = [1, 5, 10, 50, 100]
     min_samples = [5, 10, 15, 20, 25]
     K = 5
-    # rfr = RandomForestRegressor(n_estimators=10)
+    # best_depth, best_min_n = regression_tree_k_fold_vc(X, y, depths, min_samples, K, RandomForestRegressor)
+    # rfr = RandomForestRegressor(max_depth=best_depth, min_samples_leaf=best_min_n)
+    rfr = RandomForestRegressor(n_estimators=50, max_depth=50, min_samples_leaf=5)
     lr = LinearRegression()
-    lasso = Lasso(tol=2, normalize=True)
+    lasso = Lasso(normalize=True, tol=2)
     # ridge = Ridge(normalize=True)
-    all_names = ['LR', 'Lasso', 'Random Forest', 'Committee']
-    for target in ['revenue', 'vote_average']:
-        X, y = pre_precoss(train, target)
-        best_depth, best_min_n = regression_tree_k_fold_vc(X, y, depths, min_samples, K,
-                                                           RandomForestRegressor)
-        rfr = RandomForestRegressor(max_depth=best_depth, min_samples_leaf=best_min_n)
-        com = committee([lr, lasso, rfr])
-        all = [lr, lasso, rfr, com]
-        X_test, y_test = pre_precoss(valid, target)
-        for idx, m in enumerate(all):
-            m_name = all_names[idx]
-            test_model_error(X, y, X_test, y_test, m, m_name)
-            pickle.dump(m, open(f'{target}_{m_name}.pkl', 'wb'))
+    com = committee([lr, rfr, lasso])
+    all = [lr, rfr, lasso, com]
+    for m in all:
+        test_model_error(X, y, X_test, y_test, m)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
