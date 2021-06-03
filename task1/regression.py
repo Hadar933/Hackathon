@@ -156,10 +156,10 @@ def k_fold_CV(X, y, hyper_params_lst, K, modelClass):
 
 if __name__ == '__main__':
     X, y = get_Xy1y2_from_pickle("trash.pkl", "revenue")
-    best_depth = k_fold_CV(X, y, [1, 5, 10, 50, 100], 10, RandomForestRegressor)
+    best_depth = k_fold_CV(X, y, [1, 5, 10, 50, 100], 20, RandomForestRegressor)
     rfr = RandomForestRegressor(max_depth=best_depth)
     lr = LinearRegression()
-    lasso = Lasso()
-    ridge = Ridge()
+    lasso = Lasso(tol=0.001)
+    ridge = Ridge(normalize=True)
     com = committee([lasso, ridge, rfr, lr])
     plot_many_models(X, y, [lasso, ridge, rfr, lr, com])
