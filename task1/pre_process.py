@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from plotnine import ggplot, aes, geom_boxplot # add to requirements
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar # add to requirements
+from sklearn.feature_extraction.text import CountVectorizer
 import dateutil.parser as dparser
 import datetime
 import matplotlib.pyplot as plt
@@ -89,13 +90,26 @@ def features_to_drop(df, feat_cols):
     df = df.drop(df, columns=feat_cols)
     return df
 
+def try_txt(df):
+    # NOT DONE YET
+    text_col = df.overview
+    vectorizer = CountVectorizer(stop_words='english')
+
+    txt = text_col.to_list()
+    nonans_txt = [x for x in txt if str(x) != 'nan']
+    txt = " ".join(nonans_txt)
+
+    voc = vectorizer.fit_transform([txt])
+
 
 def main():
     data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
     movies_df = load_data(data_dir)
+    #movies_df = pd.read_pickle('train_old.pkl')
     movies_df = date_col_preprocess(movies_df)
     print(movies_df.shape)
     movies_df = remove_bad_samples(movies_df, 4)
+    try_txt(movies_df)
     print(movies_df.shape)
 
 
