@@ -1,0 +1,40 @@
+       id       belongs_to_collection     budget             genres            homepage        
+ Min.   :   1   Length:5659           Min.   :        0   Length:5659        Length:5659       
+ 1st Qu.:1416   Class :character      1st Qu.:        0   Class :character   Class :character  
+ Median :2830   Mode  :character      Median :  8000000   Mode  :character   Mode  :character  
+ Mean   :2830                         Mean   : 21764215                                        
+ 3rd Qu.:4244                         3rd Qu.: 28000000                                        
+ Max.   :5659                         Max.   :380000000                                        
+                                                                                               
+ original_language  original_title       overview          vote_average      vote_count   
+ Length:5659        Length:5659        Length:5659        Min.   : 0.000   Min.   :    0  
+ Class :character   Class :character   Class :character   1st Qu.: 5.900   1st Qu.:  104  
+ Mode  :character   Mode  :character   Mode  :character   Median : 6.400   Median :  416  
+                                                          Mean   : 6.308   Mean   : 1282  
+                                                          3rd Qu.: 7.000   3rd Qu.: 1329  
+                                                          Max.   :10.000   Max.   :25144  
+                                                                                          
+ production_companies production_countries release_date          runtime     
+ Length:5659          Length:5659          Length:5659        Min.   :  0.0  
+ Class :character     Class :character     Class :character   1st Qu.: 93.0  
+ Mode  :character     Mode  :character     Mode  :character   Median :103.0  
+                                                              Mean   :106.2  
+                                                              3rd Qu.:117.0  
+                                                              Max.   :339.0  
+                                                              NA's   :14     
+ spoken_languages      status            tagline             title             keywords        
+ Length:5659        Length:5659        Length:5659        Length:5659        Length:5659       
+ Class :character   Class :character   Class :character   Class :character   Class :character  
+ Mode  :character   Mode  :character   Mode  :character   Mode  :character   Mode  :character  
+                                                                                               
+                                                                                               
+                                                                                               
+                                                                                               
+     cast               crew              revenue         
+ Length:5659        Length:5659        Min.   :0.000e+00  
+ Class :character   Class :character   1st Qu.:1.617e+06  
+ Mode  :character   Mode  :character   Median :1.552e+07  
+                                       Mean   :6.321e+07  
+                                       3rd Qu.:6.368e+07  
+                                       Max.   :2.187e+09  
+                                                          
