@@ -62,9 +62,31 @@ def date_col_preprocess(df):
     days_num = today_date - date_col
     df['days_from_release'] = days_num.astype('timedelta64[D]')
 
-    # Drop week_day and release_date:
-    df = df.drop(columns=['week_day', 'release_date'])
+    # Drop release_date:
+    df = df.drop(columns=['release_date'])
 
+    return df
+
+
+def remove_bad_samples(df, nan_nums):
+    """
+    Remove samples with more than a certain nan number.
+    :param df: pandas dataframe
+    :param nan_nums: number of nans we allow
+    :return: df pandas dataframe
+    """
+    df = df[df.isnull().sum(axis=1) < nan_nums]
+    return df
+
+
+def features_to_drop(df, feat_cols):
+    """
+    removes features by choice.
+    :param df: dataframe
+    :param feat_cols: what features to delete
+    :return: df
+    """
+    df = df.drop(df, columns=feat_cols)
     return df
 
 
@@ -72,6 +94,9 @@ def main():
     data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
     movies_df = load_data(data_dir)
     movies_df = date_col_preprocess(movies_df)
+    print(movies_df.shape)
+    movies_df = remove_bad_samples(movies_df, 4)
+    print(movies_df.shape)
 
 
 def jsons_eval():
