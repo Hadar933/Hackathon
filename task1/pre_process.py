@@ -1,9 +1,7 @@
-import ast
-
-import pandas as pd, json
+import pandas as pd
 import numpy as np
 from plotnine import ggplot, aes, geom_boxplot # add to requirements
-#import holidays # add to requirements
+from pandas.tseries.holiday import USFederalHolidayCalendar as calendar # add to requirements
 import dateutil.parser as dparser
 import datetime
 import matplotlib.pyplot as plt
@@ -33,25 +31,47 @@ def date_col_preprocess(df):
     1. Change to datetime format and add Nat where problems
     2. Add weekday (NaN where problems)
     3. Add holiday
-    :param df:
-    :return:
+    4. Add how many days has passed from release
+
+    :param df: initial pandas DataFrame
+    :return: df - after processing the release date
     """
     # to datetime:
     date_col = pd.to_datetime(df.release_date, errors='coerce')
     df.release_date = date_col
-    # Add weekday
+
+    # Add weekday:
     week_day = [d.weekday() for d in date_col]
-    df[week_day] = week_day
-    # Add holidays (now only for US)
-    us_holidays = holidays.UnitedStates
+    df['week_day'] = week_day
+    # Make dummies:
+    df = pd.get_dummies(df, columns=['week_day'])
+
+    # Add holidays (now only for US):
+    cal = calendar()
+    holidays = cal.holidays(start=min(date_col), end = max(date_col))
+    df['around_holiday'] = date_col.isin(holidays)
     # Days before holiday
     delta_days = 7
+    while delta_days > 0:
+        day_ago_col = date_col - datetime.timedelta(days=delta_days)
+        df['around_holiday'] = np.logical_or(df['around_holiday'], day_ago_col.isin(holidays))
+        delta_days += -1
+
+    # Add how many days has passed:
+    today_date = datetime.datetime.now()
+    days_num = today_date - date_col
+    df['days_from_release'] = days_num.astype('timedelta64[D]')
+
+    # Drop week_day and release_date:
+    df = df.drop(columns=['week_day', 'release_date'])
+
+    return df
 
 
 def main():
     data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
     movies_df = load_data(data_dir)
-    look_at_data(movies_df)
+    movies_df = date_col_preprocess(movies_df)
 
 
 def jsons_eval():
@@ -86,4 +106,4 @@ def split():
     x=2
 
 if __name__ == '__main__':
-    split()
+    main()
