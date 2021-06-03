@@ -5,11 +5,13 @@ from pandas.tseries.holiday import USFederalHolidayCalendar as calendar  # add t
 from sklearn.feature_extraction.text import CountVectorizer
 import datetime
 import matplotlib.pyplot as plt
-import nltk
 from collections import Counter
 from sklearn.impute import SimpleImputer
+from scipy.stats import zscore
 
-nltk.download('punkt') # Add to requirements
+#nltk.download('punkt') # Add to requirements
+
+
 def load_data(dir):
     df = pd.read_csv(dir)
     return df
@@ -71,6 +73,7 @@ def date_col_preprocess(df):
     today_date = datetime.datetime.now()
     days_num = today_date - date_col
     df['days_from_release'] = days_num.astype('timedelta64[D]')
+
 
     # Drop release_date:
     df = df.drop(columns=['release_date'])
@@ -226,26 +229,34 @@ def categorical(dataframe):
     return dataframe.join(df1)
 
 
-def pre_precoss(dataframe, which_label):
+def pre_precoss(dataframe, target=None):
     """
     performs the pre_process procedure using the sub-functions
     :param dataframe:
+    :param target:
     :return:
     """
     df = remove_not_done_movies(dataframe)
-    df = replace_weird_values(df)
-    # first assuming revenue response only!!!!
+    df = replace_zero_with_nans(df)
     df = df.drop(labels=[
         'homepage', 'overview', 'title', 'belongs_to_collection', 'id', 'keywords', 'cast', 'crew',
-        'tagline', 'spoken_languages', 'original_title', 'status', 'vote_average'], axis=1)
+        'tagline', 'spoken_languages', 'original_title', 'status'], axis=1)
     df = remove_bad_samples(df, nan_nums=3)  # remove samples with more than three nan features
+    if target == 'revenue':  # for training purposes
+        df = df.drop(labels=['vote_average'], axis=1)
+        y = np.array(df.pop('revenue'))
+    if target == 'vote_average':
+        df = df.drop(labels=['revenue'], axis=1)
+        y = np.array(df.pop('vote_average'))
     df = date_col_preprocess(df)
+    #for col in ['budget', 'runtime', 'vote_count', 'days_from_release']:  # normalizing
+    #    df[col] = (df[col] - df[col].mean()) / df[col].std()
     df = categorical(df)
     df = process_original_langauge(df)
-
     imp = SimpleImputer(missing_values=np.nan, strategy="median")
-    #y = df.pop("revenue") if which_label == "revenue" else df.pop('vote_average')
-    y = df.pop('revenue')
     imp.fit(df)
     df = imp.transform(df)
-    return df, np.array(y)
+    if target:  # for training purposes, filtering zero responses
+        zeros = y == 0
+        return df[~zeros], y[~zeros]
+    return df
