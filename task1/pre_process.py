@@ -1,28 +1,30 @@
 import pandas as pd, codecs, json, heapq
 import numpy as np
-from plotnine import ggplot, aes, geom_boxplot # add to requirements
-from pandas.tseries.holiday import USFederalHolidayCalendar as calendar # add to requirements
+from plotnine import ggplot, aes, geom_boxplot  # add to requirements
+from pandas.tseries.holiday import USFederalHolidayCalendar as calendar  # add to requirements
 from sklearn.feature_extraction.text import CountVectorizer
 import datetime
 import matplotlib.pyplot as plt
 from collections import Counter
+from sklearn.impute import SimpleImputer
+
 
 # nltk.download('punkt') # Add to requirements
 def load_data(dir):
     df = pd.read_csv(dir)
     return df
 
+
 def look_at_data(df):
     features = list(df.columns)
     (
-        ggplot(df) # Dataframe
-        + aes(x="") # Variables to use
-        + geom_boxplot()
+            ggplot(df)  # Dataframe
+            + aes(x="")  # Variables to use
+            + geom_boxplot()
     )
 
+
 def remove_not_done_movies(df):
-    # Todo need to *change* and divide into in production/ release that it's likely that the income is zero.
-    # Todo divide to a long time ago vs not so long ago
     df = df.drop(df[df.status != 'Released'].index)
     return df
 
@@ -49,7 +51,7 @@ def date_col_preprocess(df):
 
     # Add holidays (now only for US):
     cal = calendar()
-    holidays = cal.holidays(start=min(date_col), end = max(date_col))
+    holidays = cal.holidays(start=min(date_col), end=max(date_col))
     df['around_holiday'] = date_col.isin(holidays)
     # Days before holiday
     delta_days = 7
@@ -134,7 +136,7 @@ def process_original_langauge(df):
 def main():
     data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
     movies_df = load_data(data_dir)
-    #movies_df = pd.read_pickle('train_old.pkl')
+    # movies_df = pd.read_pickle('train_old.pkl')
     movies_df = date_col_preprocess(movies_df)
     print(movies_df.shape)
     movies_df = remove_bad_samples(movies_df, 4)
@@ -160,12 +162,12 @@ def json_load(json_list, common_vals=None, col_name=None):
 
 def jsons_eval():
     train = pd.read_pickle('train.pkl')
-    jsons =  [list( map ( json_load , train.genres.values) ),
-              list( map ( json_load , train.production_companies.values) ),
-              list( map ( json_load , train.production_countries.values) ),
-              list( map ( json_load , train.keywords.values) ),
-              list( map ( json_load , train.cast.values) ),
-              list( map ( json_load , train.crew.values) )]
+    jsons = [list(map(json_load, train.genres.values)),
+             list(map(json_load, train.production_companies.values)),
+             list(map(json_load, train.production_countries.values)),
+             list(map(json_load, train.keywords.values)),
+             list(map(json_load, train.cast.values)),
+             list(map(json_load, train.crew.values))]
     jsons_names = ['genres', 'companies', 'countries', 'keywords', 'cast', 'crew']
     f = codecs.open('jsons.txt', 'w', 'utf-8')
     for idx, json_list in enumerate(jsons):
@@ -216,10 +218,10 @@ def categorical(dataframe):
     countries_common = {'United States of America', 'United Kingdom', 'France', 'Germany', 'Canada', 'India'}
     genres = list(map(json_load, dataframe.genres.values))
     companies = list(map(lambda p: json_load(p, companies_common, "companies"),
-                                                        dataframe.production_companies.values))
+                         dataframe.production_companies.values))
     countries = list(map(lambda p: json_load(p, countries_common, 'countries'),
-                                                        dataframe.production_countries.values))
-    df1 = pd.DataFrame({'genres': genres, 'production_countries': countries,  'production_companies': companies})
+                         dataframe.production_countries.values))
+    df1 = pd.DataFrame({'genres': genres, 'production_countries': countries, 'production_companies': companies})
     for col in df1:
         df1 = df1.assign(**pd.get_dummies(
             df1[col].apply(lambda x: pd.Series(x)).stack().reset_index(level=1, drop=True)).sum(
@@ -229,24 +231,25 @@ def categorical(dataframe):
     return dataframe.join(df1)
 
 
-def pre_precoss(dataframe):
+def pre_precoss(dataframe, which_label):
     """
     performs the pre_process procedure using the sub-functions
     :param dataframe:
     :return:
     """
-    df = dataframe.drop(labels=[
-    'homepage', 'overview', 'title', 'belongs_to_collection', 'id', 'keywords', 'cast', 'crew',
-     'tagline', 'spoken_languages', 'original_title'], axis=1)
-    df = remove_not_done_movies(df)
+    df = remove_not_done_movies(dataframe)
+    # first assuming revenue response only!!!!
+    df = df.drop(labels=[
+        'homepage', 'overview', 'title', 'belongs_to_collection', 'id', 'keywords', 'cast', 'crew',
+        'tagline', 'spoken_languages', 'original_title', 'status', 'vote_average'], axis=1)
+    df = remove_bad_samples(df, nan_nums=3)  # remove samples with more than three nan features
     df = date_col_preprocess(df)
     df = categorical(df)
     df = process_original_langauge(df)
-    return df
 
-
-
-if __name__ == '__main__':
-    train = pd.read_pickle('train.pkl')
-    pre_precoss(train)
-    #main()
+    imp = SimpleImputer(missing_values=np.nan, strategy="median")
+    #y = df.pop("revenue") if which_label == "revenue" else df.pop('vote_average')
+    y = df.pop('revenue')
+    imp.fit(df)
+    df = imp.transform(df)
+    return df, np.array(y)

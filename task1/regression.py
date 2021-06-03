@@ -4,15 +4,14 @@
 #
 ################################################
 #
-import re
-import pickle
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.linear_model import LinearRegression, Lasso, Ridge
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, VotingRegressor
+from sklearn.ensemble import RandomForestRegressor, VotingRegressor
 from sklearn.metrics import mean_squared_error
+from pre_process import pre_precoss
 
 
 def predict(csv_file):
@@ -28,32 +27,7 @@ def predict(csv_file):
     pass
 
 
-def get_Xy1y2_from_pickle(p_file_name, which_label):
-    """
-    extract sample-feature matrix, as well as labels
-    :param which_label: either revenue or vote average
-    :param p_file_name: pickle file name
-    :return: X,revenue,vote_average
-    """
-    objects = []
-    with (open(p_file_name, "rb")) as openfile:
-        while True:
-            try:
-                objects.append(pickle.load(openfile))
-            except EOFError:
-                break
-    df = objects[0]
-    df = df[['runtime', 'vote_count', 'budget', 'revenue', 'vote_average']]
-    df = df.dropna()
-    y = None
-    if which_label == 'revenue':
-        y = df.pop('revenue')
-    elif which_label == 'vote_average':
-        y = df.pop('vote_average')
-    return df, y
-
-
-def test_model_error(df, y, model):
+def test_model_error(X_train, y_train, X_test, y_test, model):
     """
     plots RMSE error of train and test data for some given model
     :param df: dataframe
@@ -61,15 +35,14 @@ def test_model_error(df, y, model):
     :param model: the model in hand
     """
     print(f"Current model is {model}")
-    X_train, X_test, y_train, y_test = train_test_split(df, y)  # default is train = 75%, test=25%
     train_size = X_train.shape[0]
     test_mse_err, train_mse_err = [], []
-    for i in range(1, train_size):
-        model.fit(X_train.iloc[:i, :], y_train.iloc[:i])
-        y_hat_train = model.predict(X_train.iloc[:i, :])
+    for i in range(100, train_size, 10):
+        model.fit(X_train[:i, :], y_train[:i])
+        y_hat_train = model.predict(X_train[:i, :])
         y_hat_test = model.predict(X_test)
         test_mse_err.append(mean_squared_error(y_test, y_hat_test))
-        train_mse_err.append(mean_squared_error(y_train.iloc[:i], y_hat_train))
+        train_mse_err.append(mean_squared_error(y_train[:i], y_hat_train))
     plot_rmse(model, test_mse_err, train_mse_err)
 
 
@@ -80,7 +53,7 @@ def plot_rmse(model, test_mse_err, train_mse_err):
     :param test_mse_err:
     :param train_mse_err:
     """
-    plt.title(f"{model} RMSE values as function of p%")
+    plt.title(f"{model} RMSE(#samples)")
     plt.xlabel('# samples'), plt.ylabel('RMSE')
     plt.plot(np.sqrt(test_mse_err))
     plt.plot(np.sqrt(train_mse_err))
@@ -121,7 +94,7 @@ def regression_tree_k_fold_vc(X, y, depths, min_samples_leaf, K, modelClass):
             rmse_lst = []
             for train, test in kfold.split(X):
                 model = initialize_specific_model(param1, param2, modelClass)
-                X_train, X_test, y_train, y_test = X.iloc[train, :], X.iloc[test, :], y.iloc[train], y.iloc[test]
+                X_train, X_test, y_train, y_test = X[train, :], X[test, :], y[train], y[test]
                 model.fit(X_train, y_train)
                 y_hat = model.predict(X_test)
                 rmse_lst.append(np.sqrt(mean_squared_error(y_test, y_hat)))
@@ -133,13 +106,20 @@ def regression_tree_k_fold_vc(X, y, depths, min_samples_leaf, K, modelClass):
 
 
 if __name__ == '__main__':
-    X, y = get_Xy1y2_from_pickle("trash.pkl", "revenue")
-    depth, min_n = regression_tree_k_fold_vc(X, y, [1, 5, 10, 50, 100], [5, 10, 15, 20, 25], 5, RandomForestRegressor)
-    rfr = RandomForestRegressor(max_depth=depth,min_samples_leaf=min_n)
+    train = pd.read_pickle('train.pkl')
+    X, y = pre_precoss(train, "revenue")
+    valid = pd.read_pickle('valid.pkl')
+    X_test, y_test = pre_precoss(valid, "")
+    depths = [1, 5, 10, 50, 100]
+    min_samples = [5, 10, 15, 20, 25]
+    K = 5
+    # best_depth, best_min_n = regression_tree_k_fold_vc(X, y, depths, min_samples, K, RandomForestRegressor)
+    # rfr = RandomForestRegressor(max_depth=best_depth, min_samples_leaf=best_min_n)
+    rfr = RandomForestRegressor(n_estimators=10)
     lr = LinearRegression()
-    lasso = Lasso(tol=0.001)
-    ridge = Ridge(normalize=True)
-    com = committee([lasso, ridge, rfr, lr])
-    all = [lr, rfr, lasso, ridge, com]
+    # lasso = Lasso(tol=0.001)
+    # ridge = Ridge(normalize=True)
+    com = committee([lr, rfr])
+    all = [lr, rfr, com]
     for m in all:
-        test_model_error(X, y, m)
+        test_model_error(X, y, X_test, y_test, m)
