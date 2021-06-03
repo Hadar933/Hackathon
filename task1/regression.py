@@ -56,12 +56,13 @@ def plot_rmse(model, test_mse_err, train_mse_err):
     :param test_mse_err:
     :param train_mse_err:
     """
-    #plt.title(f"{model} RMSE(#samples)")
+    # plt.title(f"{model} RMSE(#samples)")
     plt.xlabel('# samples'), plt.ylabel('RMSE')
     plt.plot(np.sqrt(test_mse_err), label=str(model).split("(")[0])
-    #plt.plot(np.sqrt(train_mse_err))
-    #plt.legend(["Test", "Train"])
-    #plt.show()
+    plt.grid(True)
+    # plt.plot(np.sqrt(train_mse_err))
+    # plt.legend(["Test", "Train"])
+    plt.show()
 
 
 def committee(models):
@@ -120,12 +121,9 @@ if __name__ == '__main__':
     # rfr = RandomForestRegressor(max_depth=best_depth, min_samples_leaf=best_min_n)
     rfr = RandomForestRegressor(n_estimators=50, max_depth=50, min_samples_leaf=5)
     lr = LinearRegression()
-    lasso = Lasso(normalize=True, tol=2)
+    lasso = Lasso(normalize=True, tol=2.)
     # ridge = Ridge(normalize=True)
-    com = committee([lr, rfr, lasso])
-    all = [lr, rfr, lasso, com]
+    # com = committee([lr, rfr])
+    all = [rfr, lr, lasso]
     for m in all:
         test_model_error(X, y, X_test, y_test, m)
-    plt.legend()
-    plt.grid(True)
-    plt.show()
