@@ -5,6 +5,7 @@ from pandas.tseries.holiday import USFederalHolidayCalendar as calendar  # add t
 from sklearn.feature_extraction.text import CountVectorizer
 import datetime
 import matplotlib.pyplot as plt
+import nltk
 from collections import Counter
 from sklearn.impute import SimpleImputer
 
@@ -28,13 +29,10 @@ def remove_not_done_movies(df):
     return df
 
 
-def replace_weird_values(df):
-    # Budget:
-    # If nan or zero replace with median
-    df.loc[((df.budget.isna()) | (df.budget == 0)), 'budget'] = df.budget.median()
-
-    # Runtime
-    df.loc[((df.runtime.isna()) | (df.runtime == 0)), 'runtime'] = df.runtime.median()
+def replace_zero_with_nans(df):
+    df.loc[(df.budget <= 0), 'budget'] = np.nan
+    df.loc[(df.runtime <= 0), 'runtime'] = np.nan
+    df.loc[df.vote_count < 0, 'vote_count'] = np.nan
     return df
 
 
@@ -103,7 +101,6 @@ def features_to_drop(df, feat_cols):
 
 
 def textblob_tokenizer(str_input):
-    # For
     blob = TextBlob(str_input.lower())
     tokens = blob.words
     words = [token.stem() for token in tokens]
