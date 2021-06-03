@@ -1,10 +1,3 @@
-import numpy
-import pickle
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-from plotnine import *
-from plotnine.data import mpg
 ################################################
 #
 #     Task 1 - predict movies revenue & ranking
@@ -12,7 +5,14 @@ from plotnine.data import mpg
 ################################################
 #
 
-
+import numpy
+import pickle
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+from plotnine import *
+from plotnine.data import mpg
+from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, VotingRegressor
@@ -114,6 +114,28 @@ def committee(models):
     return VotingRegressor(estimators=estimators)
 
 
+def k_fold_CV():
+    """
+    performs k-fold cross validation to select desirable Hyper Parameter
+    :return:
+    """
+
+
+def split():
+    df = pd.read_csv('movies_dataset.csv')
+    train, validate, test = \
+        np.split(df.sample(frac=1, random_state=42),
+                 [int(.6 * len(df)), int(.8 * len(df))])
+    trash_idx = np.zeros((train.shape[0])).astype(numpy.bool)
+    trash_idx[[np.random.randint(0, train.shape[0], 100)]] = 1
+    trash = train.iloc[trash_idx]
+    train = train.iloc[~trash_idx]
+    train.to_pickle('train.pkl')
+    test.to_pickle('test.pkl')
+    validate.to_pickle('valid.pkl')
+    trash.to_pickle('trash.pkl')
+
+
 if __name__ == '__main__':
     X, y1, y2 = get_Xy1y2_from_pickle("trash.pkl")
     X = X[['runtime', 'vote_count', 'budget']]
@@ -122,4 +144,3 @@ if __name__ == '__main__':
     lr = LinearRegression()
     com = committee([gbr, rfr, lr])
     plot_many_models(X, y1, [gbr, rfr, lr, com])
-
