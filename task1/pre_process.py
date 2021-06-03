@@ -31,18 +31,20 @@ def date_col_preprocess(df):
     1. Change to datetime format and add Nat where problems
     2. Add weekday (NaN where problems)
     3. Add holiday
-    :param df:
-    :return:
+    4. Add how many days has passed from release
+
+    :param df: initial pandas DataFrame
+    :return: df - after processing the release date
     """
     # to datetime:
     date_col = pd.to_datetime(df.release_date, errors='coerce')
     df.release_date = date_col
 
-    # Add weekday
+    # Add weekday:
     week_day = [d.weekday() for d in date_col]
-    df[week_day] = week_day
+    df['week_day'] = week_day
 
-    # Add holidays (now only for US)
+    # Add holidays (now only for US):
     cal = calendar()
     holidays = cal.holidays(start=min(date_col), end = max(date_col))
     df['around_holiday'] = date_col.isin(holidays)
@@ -52,6 +54,11 @@ def date_col_preprocess(df):
         day_ago_col = date_col - datetime.timedelta(days=delta_days)
         df['around_holiday'] = np.logical_or(df['around_holiday'], day_ago_col.isin(holidays))
         delta_days += -1
+
+    # Add how many days has passed:
+    today_date = datetime.datetime.now()
+    days_num = today_date - date_col
+    df['days_from_release'] = days_num.astype('timedelta64[D]')
 
     return df
 
