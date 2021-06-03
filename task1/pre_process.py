@@ -1,14 +1,13 @@
-import pandas as pd
+import pandas as pd, codecs, json, heapq
 import numpy as np
 from plotnine import ggplot, aes, geom_boxplot # add to requirements
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar # add to requirements
 from sklearn.feature_extraction.text import CountVectorizer
-from textblob import TextBlob
-import nltk # Add to requirements
 import datetime
 import matplotlib.pyplot as plt
+from collections import Counter
 
-nltk.download('punkt') # Add to requirements
+# nltk.download('punkt') # Add to requirements
 def load_data(dir):
     df = pd.read_csv(dir)
     return df
@@ -128,8 +127,9 @@ def process_original_langauge(df):
             (df.original_language != 'hi') &
             (df.original_language != 'ru')), 'original_language'] = 'others'
 
-    df = pd.get_dummies(df, columns='original_langauge')
+    df = pd.get_dummies(df, columns=['original_language'])
     return df
+
 
 def main():
     data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
@@ -142,21 +142,52 @@ def main():
     print(movies_df.shape)
 
 
+def json_load(json_list, common_vals=None, col_name=None):
+    """
+    takes a list of string json objects and returns a list of the inside features. e.g. genres or production companies
+    :param json_list:
+    :param common_vals: for some features there are many options so we store the common or label it other
+    :return:
+    """
+    try:
+        list_of_dicts = json.loads(json_list.replace("'", "\""))
+        features = [dictio['name'] for dictio in list_of_dicts if not common_vals or dictio['name'] in common_vals]
+        if not features and len(list_of_dicts) > 0: features = [f'other-{col_name}']
+        return features
+    except:
+        return np.nan
+
+
 def jsons_eval():
-    train = pd.read_pickle('train_old.pkl')
-    """jsons = {'genre': train.genres,   'companies' : train.production_companies,
-             'countries' : train.production_countries, 'keywords' : train.keywords}
-    for json_list in jsons:
+    train = pd.read_pickle('train.pkl')
+    jsons =  [list( map ( json_load , train.genres.values) ),
+              list( map ( json_load , train.production_companies.values) ),
+              list( map ( json_load , train.production_countries.values) ),
+              list( map ( json_load , train.keywords.values) ),
+              list( map ( json_load , train.cast.values) ),
+              list( map ( json_load , train.crew.values) )]
+    jsons_names = ['genres', 'companies', 'countries', 'keywords', 'cast', 'crew']
+    f = codecs.open('jsons.txt', 'w', 'utf-8')
+    for idx, json_list in enumerate(jsons):
         stats = dict()
-        for json1 in jsons[json_list]:
-            for entry in json.loads(json1):
-                if entry in stats:
-                    stats[entry] += 1
-                else:
-                    stats[entry] = 1
-        print(f'-------------{json_list}--------------------\n{stats}')"""
-    z =  list( map ( lambda x : json.loads(x.replace("'", "\"")) , train.genres.values) )
-    x = 2
+        for sample in json_list:
+            if sample is not None:
+                for entry in sample:
+                    name = entry['name']
+                    if jsons_names[idx] == 'crew': name += ' dep: ' + entry['known_for_department']
+                    if name in stats:
+                        stats[name] += 1
+                    else:
+                        stats[name] = 1
+        if len(stats) < 20:
+            result = f'-----------------{jsons_names[idx]}---total_vals={len(stats)}--------\n{stats}\n'
+        else:
+            big20 = dict(Counter(stats).most_common(20))
+            result = f'------------------{jsons_names[idx]}-----total-vals={len(stats)}-----best20\n{big20}\n'
+        f.write(u'' + result)
+    plt.show()
+    f.close()
+
 
 def split():
     df = pd.concat([pd.read_csv('movies_dataset.csv'), pd.read_csv('movies_dataset_part2.csv')])
@@ -171,7 +202,51 @@ def split():
     test.to_pickle('test.pkl')
     validate.to_pickle('valid.pkl')
     trash.to_pickle('trash.pkl')
-    x=2
+
+
+def categorical(dataframe):
+    """
+    creates dummy matrieces from the categorical variables
+    :param dataframe:
+    :return:
+    """
+    companies_common = {'Universal Pictures', 'Warner Bros. Pictures', 'Paramount',
+                        'Columbia Pictures', '20th Century Fox', 'Metro-Goldwyn-Mayer',
+                        'New Line Cinema', 'Walt Disney Pictures'}
+    countries_common = {'United States of America', 'United Kingdom', 'France', 'Germany', 'Canada', 'India'}
+    genres = list(map(json_load, dataframe.genres.values))
+    companies = list(map(lambda p: json_load(p, companies_common, "companies"),
+                                                        dataframe.production_companies.values))
+    countries = list(map(lambda p: json_load(p, countries_common, 'countries'),
+                                                        dataframe.production_countries.values))
+    df1 = pd.DataFrame({'genres': genres, 'production_countries': countries,  'production_companies': companies})
+    for col in df1:
+        df1 = df1.assign(**pd.get_dummies(
+            df1[col].apply(lambda x: pd.Series(x)).stack().reset_index(level=1, drop=True)).sum(
+            level=0))
+        df1 = df1.drop(col, axis=1)
+        dataframe = dataframe.drop(col, axis=1)
+    return dataframe.join(df1)
+
+
+def pre_precoss(dataframe):
+    """
+    performs the pre_process procedure using the sub-functions
+    :param dataframe:
+    :return:
+    """
+    df = dataframe.drop(labels=[
+    'homepage', 'overview', 'title', 'belongs_to_collection', 'id', 'keywords', 'cast', 'crew',
+     'tagline', 'spoken_languages', 'original_title'], axis=1)
+    df = remove_not_done_movies(df)
+    df = date_col_preprocess(df)
+    df = categorical(df)
+    df = process_original_langauge(df)
+    return df
+
+
 
 if __name__ == '__main__':
-    main()
+    train = pd.read_pickle('train.pkl')
+    pre_precoss(train)
+    #main()
