@@ -1,7 +1,6 @@
 import numpy
-
+import pickle
 import pandas as pd
-from sklearn import model_selection
 import numpy as np
 ################################################
 #
@@ -9,6 +8,39 @@ import numpy as np
 #
 ################################################
 #
+
+
+from sklearn.linear_model import LinearRegression
+from sklearn.tree import DecisionTreeRegressor
+
+
+def RMSE(y, y_hat):
+    """
+    calculates root mean square error
+    :param y: labels
+    :param y_hat: prediction
+    :return: rmse
+    """
+    return np.sqrt(np.mean((y_hat - y) ** 2))
+
+
+def get_Xy1y2_from_pickle(p_file_name):
+    """
+    extract sample-feature matrix, as well as labels
+    :param p_file_name: pickle file name
+    :return: X,revenue,vote_average
+    """
+    objects = []
+    with (open(p_file_name, "rb")) as openfile:
+        while True:
+            try:
+                objects.append(pickle.load(openfile))
+            except EOFError:
+                break
+    df = objects[0]
+    revenue = df.pop('revenue')
+    vote_avg = df.pop('vote_average')
+    return df, revenue, vote_avg
 
 
 def predict(csv_file):
@@ -19,7 +51,7 @@ def predict(csv_file):
     :return: a tuple - (a python list with the movies revenues, a python list with the movies avg_votes)
     """
 
-    #your code goes here...
+    # your code goes here...
 
     pass
 
@@ -38,3 +70,6 @@ def split():
     validate.to_pickle('valid.pkl')
     trash.to_pickle('trash.pkl')
 
+
+if __name__ == '__main__':
+    X, revenue, vote_avg = get_Xy1y2_from_pickle("trash.pkl")
