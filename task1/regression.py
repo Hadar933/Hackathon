@@ -4,55 +4,17 @@
 #
 ################################################
 #
+import re
 
 import numpy
 import pickle
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
-from plotnine import *
-from plotnine.data import mpg
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.linear_model import LinearRegression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor, VotingRegressor
-
-
-def RMSE(y, y_hat):
-    """
-    calculates root mean square error
-    :param y: labels
-    :param y_hat: prediction
-    :return: rmse
-    """
-    return np.sqrt(np.mean((y_hat - y) ** 2))
-
-
-def get_Xy1y2_from_pickle(p_file_name):
-    """
-    extract sample-feature matrix, as well as labels
-    :param p_file_name: pickle file name
-    :return: X,revenue,vote_average
-    """
-    objects = []
-    with (open(p_file_name, "rb")) as openfile:
-        while True:
-            try:
-                objects.append(pickle.load(openfile))
-            except EOFError:
-                break
-    df = objects[0]
-    revenue = df.pop('revenue')
-    vote_avg = df.pop('vote_average')
-    return df, revenue, vote_avg
-
-
-def plot_many_models(df, y, regressor_lst):
-    for model in regressor_lst:
-        print(f"current model = {model}")
-        rmse_plot(df, y, model)
-    plt.legend(regressor_lst)
-    plt.show()
 
 
 def predict(csv_file):
@@ -68,6 +30,55 @@ def predict(csv_file):
     pass
 
 
+def RMSE(y, y_hat):
+    """
+    calculates root mean square error
+    :param y: labels
+    :param y_hat: prediction
+    :return: rmse
+    """
+    return np.sqrt(np.mean((y_hat - y) ** 2))
+
+
+def get_Xy1y2_from_pickle(p_file_name, which_label):
+    """
+    extract sample-feature matrix, as well as labels
+    :param which_label: either revenue or vote average
+    :param p_file_name: pickle file name
+    :return: X,revenue,vote_average
+    """
+    objects = []
+    with (open(p_file_name, "rb")) as openfile:
+        while True:
+            try:
+                objects.append(pickle.load(openfile))
+            except EOFError:
+                break
+    df = objects[0]
+    df = df[['runtime', 'vote_count', 'budget', 'revenue', 'vote_average']]
+    df = df.dropna()
+    y = None
+    if which_label == 'revenue':
+        y = df.pop('revenue')
+    elif which_label == 'vote_average':
+        y = df.pop('vote_average')
+    return df, y
+
+
+def plot_many_models(df, y, regressor_lst):
+    """
+    plots multiple RMSE
+    :param df:
+    :param y:
+    :param regressor_lst:
+    """
+    for model in regressor_lst:
+        print(f"current model = {model}")
+        rmse_plot(df, y, model)
+    plt.legend(regressor_lst)
+    plt.show()
+
+
 def rmse_plot(df, y, model):
     """
     plots RMSE error of train and test data for some given model
@@ -78,7 +89,6 @@ def rmse_plot(df, y, model):
     train, test, y_train, y_test = train_test_split(df, y)  # default is train = 75%, test=25%
     train_size = train.shape[0]
     test_rmse_err = []
-    average_y_hat = []  # average
     min_index = 2  # for data < 100, 1% (for example) isn't even one sample, so we give a threshold
     count = 0
     for p in range(min_index, 101):
@@ -114,18 +124,27 @@ def committee(models):
     return VotingRegressor(estimators=estimators)
 
 
-def k_fold_CV():
+def k_fold_CV(X, y, hyper_params_lst, K, model):
     """
     performs k-fold cross validation to select desirable Hyper Parameter
     :return:
     """
+    kfold = KFold(K, True, 1)
+    best_param, best_error = None, np.inf
+    for param in hyper_params_lst:
+        rmse_lst = []
+        for train, test in kfold.split(X):
+            model.fit(X[train])
+            y_hat = model.predict(X[test])
+            rmse_lst.append(RMSE(y, y_hat))
+        curr_param_error = np.mean(rmse_lst)
+        best_param, best_error = (param, curr_param_error) if curr_param_error < best_error else (
+            best_param, best_error)
 
 
 def split():
     df = pd.read_csv('movies_dataset.csv')
-    train, validate, test = \
-        np.split(df.sample(frac=1, random_state=42),
-                 [int(.6 * len(df)), int(.8 * len(df))])
+    train, validate, test = np.split(df.sample(frac=1, random_state=42), [int(.6 * len(df)), int(.8 * len(df))])
     trash_idx = np.zeros((train.shape[0])).astype(numpy.bool)
     trash_idx[[np.random.randint(0, train.shape[0], 100)]] = 1
     trash = train.iloc[trash_idx]
@@ -137,10 +156,10 @@ def split():
 
 
 if __name__ == '__main__':
-    X, y1, y2 = get_Xy1y2_from_pickle("trash.pkl")
-    X = X[['runtime', 'vote_count', 'budget']]
+    X, y = get_Xy1y2_from_pickle("trash.pkl", "revenue")
     gbr = GradientBoostingRegressor()
     rfr = RandomForestRegressor()
     lr = LinearRegression()
     com = committee([gbr, rfr, lr])
-    plot_many_models(X, y1, [gbr, rfr, lr, com])
+    lst = [gbr, rfr, lr, com]
+    plot_many_models(X, y, lst)
