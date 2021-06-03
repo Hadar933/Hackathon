@@ -43,6 +43,8 @@ def date_col_preprocess(df):
     # Add weekday:
     week_day = [d.weekday() for d in date_col]
     df['week_day'] = week_day
+    # Make dummies:
+    df = pd.get_dummies(df, columns=['week_day'])
 
     # Add holidays (now only for US):
     cal = calendar()
@@ -60,13 +62,16 @@ def date_col_preprocess(df):
     days_num = today_date - date_col
     df['days_from_release'] = days_num.astype('timedelta64[D]')
 
+    # Drop week_day and release_date:
+    df = df.drop(columns=['week_day', 'release_date'])
+
     return df
 
 
 def main():
     data_dir = r"C:\Users\Owner\Documents\GitHub\IML.HUJI\Hackathon\task1\movies_dataset.csv"
     movies_df = load_data(data_dir)
-    movies_df =date_col_preprocess(movies_df)
+    movies_df = date_col_preprocess(movies_df)
 
 
 def jsons_eval():
