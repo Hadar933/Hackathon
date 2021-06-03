@@ -63,21 +63,7 @@ def get_Xy1y2_from_pickle(p_file_name, which_label):
     return df, y
 
 
-def plot_many_models(df, y, regressor_lst):
-    """
-    plots multiple RMSE
-    :param df:
-    :param y:
-    :param regressor_lst:
-    """
-    for model in regressor_lst:
-        print(f"current model = {model}")
-        rmse_plot(df, y, model)
-    plt.legend([re.split("\(", str(item))[0] for item in regressor_lst])
-    plt.show()
-
-
-def rmse_plot(df, y, model):
+def test_model_error(df, y, model):
     """
     plots RMSE error of train and test data for some given model
     :param df: dataframe
@@ -86,30 +72,57 @@ def rmse_plot(df, y, model):
     """
     train, test, y_train, y_test = train_test_split(df, y)  # default is train = 75%, test=25%
     train_size = train.shape[0]
-    test_rmse_err = []
-    min_index = 2  # for data < 100, 1% (for example) isn't even one sample, so we give a threshold
-    count = 0
+    test_rmse_err, train_rmse_err = [], []
+    min_index = 1  # for data < 100, 1% (for example) isn't even one sample, so we give a threshold
     for p in range(min_index, 101):
-        count += 1
         # sliced data given some percentage:
-        max_index = int((p / 100) * train_size)
-        curr_training_set = train.iloc[:max_index, :]
-        curr_test_set = test.iloc[:max_index, :]
-        curr_y_train = y_train[:max_index]
-        curr_y_test = y_test[:max_index]
+        test_set, train_set, curr_y_test, curr_y_train = slice_data(p, test, train, train_size, y_test, y_train)
+        # fitting on train, predicting on test:
+        y_hat_test, y_hat_train = fit_and_predict(test_set, train_set, curr_y_train, model)
+        # calculating error:
+        calculate_error(curr_y_test, curr_y_train, test_rmse_err, train_rmse_err, y_hat_test, y_hat_train)
+    plot_rmse(min_index, model, test_rmse_err, train_rmse_err)
 
-        # fitting on train, predicting on test
-        model.fit(curr_training_set, curr_y_train)
-        y_hat = model.predict(curr_test_set)
 
-        # calculating error
-        curr_test_rmse_err = RMSE(curr_y_test, y_hat)
-        test_rmse_err.append(curr_test_rmse_err)
-
-    plt.title("RMSE values as function of p%")
+def plot_rmse(min_index, model, test_rmse_err, train_rmse_err):
+    """
+    plots RMSE error for some given model
+    :param min_index:
+    :param model:
+    :param test_rmse_err:
+    :param train_rmse_err:
+    :return:
+    """
+    plt.title(f"{model} RMSE values as function of p%")
     plt.xlabel('Percentage (p%)'), plt.ylabel('RMSE')
     percentage = range(min_index, 101)
     plt.plot(percentage, test_rmse_err)
+    plt.plot(percentage, train_rmse_err)
+    plt.legend(["Test", "Train"])
+    plt.show()
+
+
+def calculate_error(curr_y_test, curr_y_train, test_rmse_err, train_rmse_err, y_hat_test, y_hat_train):
+    curr_test_rmse_err = RMSE(curr_y_test, y_hat_test)
+    curr_train_rmse_err = RMSE(curr_y_train, y_hat_train)
+    test_rmse_err.append(curr_test_rmse_err)
+    train_rmse_err.append(curr_train_rmse_err)
+
+
+def fit_and_predict(curr_test_set, curr_training_set, curr_y_train, model):
+    model.fit(curr_training_set, curr_y_train)
+    y_hat_test = model.predict(curr_test_set)
+    y_hat_train = model.predict(curr_training_set)
+    return y_hat_test, y_hat_train
+
+
+def slice_data(p, test, train, train_size, y_test, y_train):
+    max_index = int((p / 100) * train_size)
+    curr_training_set = train.iloc[:max_index, :]
+    curr_test_set = test.iloc[:max_index, :]
+    curr_y_train = y_train[:max_index]
+    curr_y_test = y_test[:max_index]
+    return curr_test_set, curr_training_set, curr_y_test, curr_y_train
 
 
 def committee(models):
@@ -162,4 +175,6 @@ if __name__ == '__main__':
     lasso = Lasso(tol=0.001)
     ridge = Ridge(normalize=True)
     com = committee([lasso, ridge, rfr, lr])
-    plot_many_models(X, y, [lasso, ridge, rfr, lr, com])
+    all = [lr]
+    for m in all:
+        test_model_error(X, y, m)
