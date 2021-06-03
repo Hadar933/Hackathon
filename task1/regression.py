@@ -7,7 +7,6 @@
 import re
 import pickle
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split, KFold
 from sklearn.linear_model import LinearRegression, Lasso, Ridge
@@ -27,16 +26,6 @@ def predict(csv_file):
     # your code goes here...
 
     pass
-
-
-def RMSE(y, y_hat):
-    """
-    calculates root mean square error
-    :param y: labels
-    :param y_hat: prediction
-    :return: rmse
-    """
-    return (mean_squared_error(y, y_hat))
 
 
 def get_Xy1y2_from_pickle(p_file_name, which_label):
@@ -91,7 +80,7 @@ def plot_rmse(model, test_mse_err, train_mse_err):
     :param test_mse_err:
     :param train_mse_err:
     """
-    plt.title(f"{re.split(model,)} RMSE values as function of p%")
+    plt.title(f"{model} RMSE values as function of p%")
     plt.xlabel('# samples'), plt.ylabel('RMSE')
     plt.plot(np.sqrt(test_mse_err))
     plt.plot(np.sqrt(train_mse_err))
@@ -109,42 +98,44 @@ def committee(models):
     return VotingRegressor(estimators=estimators)
 
 
-def initialize_specific_model(param, modelClass):
+def initialize_specific_model(param1, param2, modelClass):
     """
     given some param and regression class model, returns an instance of such model with param initialized
-    :param param: ex. height of tree
+    :param param1: ex. height of tree
     :param modelClass: some regression class
     :return: instance of class
     """
     if modelClass == RandomForestRegressor:
-        return modelClass(max_depth=param)
+        return modelClass(max_depth=param1, min_samples_leaf=param2)
 
 
-def k_fold_CV(X, y, hyper_params_lst, K, modelClass):
+def regression_tree_k_fold_vc(X, y, depths, min_samples_leaf, K, modelClass):
     """
-    performs k-fold cross validation to select desirable Hyper Parameter
-    :return:
+    performs k-fold cross validation to select desirable Hyper Parameter for regression tree
+    :return: parameters with smallest error
     """
     kfold = KFold(K, True, 1)
-    best_param, best_error = None, np.inf
-    for param in hyper_params_lst:
-        rmse_lst = []
-        for train, test in kfold.split(X):
-            model = initialize_specific_model(param, modelClass)
-            X_train, X_test, y_train, y_test = X.iloc[train, :], X.iloc[test, :], y.iloc[train], y.iloc[test]
-            model.fit(X_train, y_train)
-            y_hat = model.predict(X_test)
-            rmse_lst.append(RMSE(y_test, y_hat))
-        curr_param_error = np.mean(rmse_lst)
-        best_param, best_error = (param, curr_param_error) if curr_param_error < best_error else (
-            best_param, best_error)
-    return best_param
+    mat = np.zeros((len(depths), len(min_samples_leaf)))
+    for i, param1 in enumerate(depths):
+        for j, param2 in enumerate(min_samples_leaf):
+            rmse_lst = []
+            for train, test in kfold.split(X):
+                model = initialize_specific_model(param1, param2, modelClass)
+                X_train, X_test, y_train, y_test = X.iloc[train, :], X.iloc[test, :], y.iloc[train], y.iloc[test]
+                model.fit(X_train, y_train)
+                y_hat = model.predict(X_test)
+                rmse_lst.append(np.sqrt(mean_squared_error(y_test, y_hat)))
+            p1p2_mean_err = np.mean(rmse_lst)
+            mat[i][j] = p1p2_mean_err
+    ind = np.unravel_index(np.argmin(mat, axis=None), mat.shape)
+    param1_ind, param2_ind = ind[0], ind[1]
+    return depths[param1_ind], min_samples_leaf[param2_ind]
 
 
 if __name__ == '__main__':
     X, y = get_Xy1y2_from_pickle("trash.pkl", "revenue")
-    best_depth = k_fold_CV(X, y, [1, 5, 10, 50, 100], 20, RandomForestRegressor)
-    rfr = RandomForestRegressor(max_depth=best_depth)
+    depth, min_n = regression_tree_k_fold_vc(X, y, [1, 5, 10, 50, 100], [5, 10, 15, 20, 25], 5, RandomForestRegressor)
+    rfr = RandomForestRegressor(max_depth=depth,min_samples_leaf=min_n)
     lr = LinearRegression()
     lasso = Lasso(tol=0.001)
     ridge = Ridge(normalize=True)
