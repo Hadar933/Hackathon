@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from plotnine import ggplot, aes, geom_boxplot
+import dateutil.parser as dparser
+import datetime
 import matplotlib.pyplot as plt
 
 
@@ -21,10 +23,10 @@ def remove_not_done_movies(df):
     return df
 
 
-def insert_NaNs(df):
-    # Replace bad dates with NaNs:
-    df = df.mask(df[df.release_date])
-    pass
+def date_to_datetime_format(df):
+    date_col = pd.to_datetime(df.release_date, errors='coerce')
+    df.release_date = date_col
+    return df
 
 
 def main():
