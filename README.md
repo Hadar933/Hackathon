@@ -1,2 +1,2 @@
 # Hackathon
- YAYYYY
+Predicting revenue and average ratings of Movies!
