@@ -1,3 +1,4 @@
+import nltk as nltk
 import pandas as pd, codecs, json, heapq
 import numpy as np
 from plotnine import ggplot, aes, geom_boxplot  # add to requirements

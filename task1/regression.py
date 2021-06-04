@@ -121,9 +121,9 @@ if __name__ == '__main__':
     # rfr = RandomForestRegressor(max_depth=best_depth, min_samples_leaf=best_min_n)
     rfr = RandomForestRegressor(n_estimators=50, max_depth=50, min_samples_leaf=5)
     lr = LinearRegression()
-    lasso = Lasso(normalize=True, tol=2.)
+    #lasso = Lasso(normalize=True, tol=2.)
     # ridge = Ridge(normalize=True)
-    # com = committee([lr, rfr])
-    all = [rfr, lr, lasso]
+    com = committee([lr, rfr])
+    all = [rfr, lr, com]
     for m in all:
         test_model_error(X, y, X_test, y_test, m)
