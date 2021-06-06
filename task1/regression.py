@@ -12,7 +12,7 @@ from sklearn.model_selection import train_test_split, KFold
 from sklearn.linear_model import LinearRegression, Lasso, Ridge
 from sklearn.ensemble import RandomForestRegressor, VotingRegressor
 from sklearn.metrics import mean_squared_error
-from pre_process import pre_precoss
+from pre_process import pre_precoss, predict_pre_process
 
 
 def predict(csv_file):
@@ -23,14 +23,39 @@ def predict(csv_file):
     :return: a tuple - (a python list with the movies revenues, a python list with the movies avg_votes)
     """
     dataframe = pd.read_csv(csv_file)
-    X = pre_precoss(dataframe)
+    X = predict_pre_process(dataframe)
     rev_model = pickle.load(open('rev_model.pkl', 'rb'))
     rating_model = pickle.load(open('rating_model.pkl', 'rb'))
     revenues, ratings = rev_model.predict(X).tolist(), rating_model.predict(X).tolist()
     return revenues, ratings
 
 
-def test_model_error(X_train, y_train, X_test, y_test, model):
+def eval_test_error():
+    """
+    evaluates the test error according to the
+    :param df: dataframe
+    :param y: labels
+    :param model: the model in hand
+    """
+    models = [pickle.load(open('rev_model.pkl', 'rb')), pickle.load(open('rating_model.pkl', 'rb'))]
+    test = pd.read_pickle(open('test.pkl', 'rb'))
+    targets = ['revenue', 'vote_average']
+    for idx, model in enumerate(models):
+        target = targets[idx]
+        test_mse_err = []
+        for i in range(100, test.shape[0], 10):
+            X, y_test = pre_precoss(test[:i], target)
+            y_hat_test = model.predict(X[:i])
+            test_mse_err.append(mean_squared_error(y_test, y_hat_test))
+        plt.title(f"{target} RMSE(#samples)")
+        plt.xlabel('# samples'), plt.ylabel('RMSE')
+        plt.plot(np.sqrt(test_mse_err))
+        plt.legend(["Test"])
+        plt.show()
+        print(f'tagret:  {targets[idx]} + \tfinal error: {np.sqrt(test_mse_err[-1]):.2E}')
+
+
+def test_model_error(X_train, y_train, X_test, y_test, model, m_name):
     """
     plots RMSE error of train and test data for some given model
     :param df: dataframe
@@ -110,7 +135,7 @@ def regression_tree_k_fold_vc(X, y, depths, min_samples_leaf, K, modelClass):
 
 
 if __name__ == '__main__':
-    train = pd.read_pickle('train.pkl')
+    """train = pd.read_pickle('train.pkl')
     X, y = pre_precoss(train, "revenue")
     valid = pd.read_pickle('valid.pkl')
     X_test, y_test = pre_precoss(valid, "")
@@ -126,4 +151,5 @@ if __name__ == '__main__':
     # com = committee([lr, rfr])
     all = [rfr, lr, lasso]
     for m in all:
-        test_model_error(X, y, X_test, y_test, m)
+        test_model_error(X, y, X_test, y_test, m)"""
+    eval_test_error()

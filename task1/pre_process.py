@@ -1,29 +1,30 @@
 import pandas as pd, codecs, json, heapq
 import numpy as np
-from plotnine import ggplot, aes, geom_boxplot  # add to requirements
+#from plotnine import ggplot, aes, geom_boxplot  # add to requirements
 from pandas.tseries.holiday import USFederalHolidayCalendar as calendar  # add to requirements
+from sklearn.feature_extraction.text import CountVectorizer
 import datetime
 import matplotlib.pyplot as plt
 from collections import Counter
 from sklearn.impute import SimpleImputer
-import nltk
-from sklearn.feature_extraction.text import CountVectorizer
+from scipy.stats import zscore
+
+#nltk.download('punkt') # Add to requirements
 
 
-# nltk.download('punkt') # Add to requirements
 def load_data(dir):
     df = pd.read_csv(dir)
     return df
 
-
+"""
 def look_at_data(df):
     features = list(df.columns)
     (
-            ggplot(df)  # Dataframe
-            + aes(x="")  # Variables to use
-            + geom_boxplot()
+        ggplot(df) # Dataframe
+        + aes(x="") # Variables to use
+        + geom_boxplot()
     )
-
+"""
 
 def remove_not_done_movies(df):
     df = df.drop(df[df.status != 'Released'].index)
@@ -64,6 +65,7 @@ def date_col_preprocess(df):
     2. Add weekday (NaN where problems)
     3. Add holiday
     4. Add how many days has passed from release
+
     :param df: initial pandas DataFrame
     :return: df - after processing the release date
     """
@@ -93,6 +95,7 @@ def date_col_preprocess(df):
     days_num = today_date - date_col
     df['days_from_release'] = days_num.astype('timedelta64[D]')
 
+
     # Drop release_date:
     df = df.drop(columns=['release_date'])
 
@@ -120,6 +123,34 @@ def features_to_drop(df, feat_cols):
     df = df.drop(df, columns=feat_cols)
     return df
 
+
+def textblob_tokenizer(str_input):
+    blob = TextBlob(str_input.lower())
+    tokens = blob.words
+    words = [token.stem() for token in tokens]
+    return words
+
+
+def add_description_word_features(df):
+    """
+    make features for words
+    :param df:
+    :return:
+    """
+    text_col = df.overview
+    txt = text_col.to_list()
+    txt = ['missing' if x is np.nan else x for x in txt]
+    # nonans_txt = [x for x in txt if str(x) != 'nan']
+    # txt = " ".join(nonans_txt)
+    # words = txt.split(' ')
+    # stem_words = [porter_stemmer.stem(w) for w in words]
+    vectorizer = CountVectorizer(stop_words='english', tokenizer=textblob_tokenizer)
+    matrix = vectorizer.fit_transform(txt)
+    # write in data frame:
+    results = pd.DataFrame(matrix.toarray(), columns=vectorizer.get_feature_names())
+    # Fixme: the join works in a weird way
+    df = df.join(results)
+    return df
 
 
 def process_original_langauge(df):
@@ -241,7 +272,27 @@ def pre_precoss(dataframe, which_label):
     # df = add_description_word_features(df)
     df = df.drop(labels=[
         'homepage', 'overview', 'title', 'belongs_to_collection', 'id', 'keywords', 'cast', 'crew',
-        'tagline', 'spoken_languages', 'original_title', 'status', 'vote_average'], axis=1)
+        'tagline', 'spoken_languages', 'original_title', 'status'], axis=1)
+    df = remove_bad_samples(df, nan_nums=3)  # remove samples with more than three nan features
+    df = date_col_preprocess(df)
+    df = categorical(df)
+    df = process_original_langauge(df)
+
+    imp = SimpleImputer(missing_values=np.nan, strategy="median")
+    y = df.pop("revenue") if which_label == "revenue" else df.pop('vote_average')
+    df.drop(labels=['vote_average'], axis=1) if which_label == "revenue" else df.drop(labels=['revenue'], axis=1)
+    imp.fit(df)
+    df = imp.transform(df)
+    return df, np.array(y)
+
+
+def predict_pre_process(dataframe):
+    df = remove_not_done_movies(dataframe)
+    # first assuming revenue response only!!!!
+    # df = add_description_word_features(df)
+    df = df.drop(labels=[
+        'homepage', 'overview', 'title', 'belongs_to_collection', 'id', 'keywords', 'cast', 'crew',
+        'tagline', 'spoken_languages', 'original_title', 'status'], axis=1)
     df = remove_bad_samples(df, nan_nums=3)  # remove samples with more than three nan features
     df = date_col_preprocess(df)
     df = categorical(df)
@@ -249,7 +300,6 @@ def pre_precoss(dataframe, which_label):
 
     imp = SimpleImputer(missing_values=np.nan, strategy="median")
     # y = df.pop("revenue") if which_label == "revenue" else df.pop('vote_average')
-    y = df.pop('revenue')
     imp.fit(df)
     df = imp.transform(df)
-    return df, np.array(y)
+    return df
